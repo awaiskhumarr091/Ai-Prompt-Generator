@@ -17,7 +17,7 @@ async function callClaude(content, opts={}){
       })
     });
   }catch(networkErr){
-    throw new Error("Can't reach the server. Make sure you started it with `npm start` and opened http://localhost:3000 (not the .html file directly).");
+    throw new Error("Can't reach the server. If running locally, start it with `npm start` and open http://localhost:3000. If deployed, make sure the api/ folder was included and ANTHROPIC_API_KEY is set in your host's environment variables.");
   }
 
   let data;
@@ -57,7 +57,7 @@ function wireImageSlot(prefix, onReady, onCleared){
   function handle(file){
     if(errEl) showError(errEl, '');
     if(!file.type.match(/image\/(png|jpeg|jpg|webp)/)){ if(errEl) showError(errEl, 'Please upload a PNG, JPG, or WEBP image.'); return; }
-    if(file.size > 5 * 1024 * 1024){ if(errEl) showError(errEl, 'That image is larger than 5MB. Please use a smaller one.'); return; }
+    if(file.size > 3 * 1024 * 1024){ if(errEl) showError(errEl, 'That image is larger than 3MB. Please use a smaller one.'); return; }
     const reader = new FileReader();
     reader.onload = ()=>{
       data = { base64: reader.result.split(',')[1], mediaType: file.type };
