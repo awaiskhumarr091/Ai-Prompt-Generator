@@ -1,17 +1,36 @@
 
-// ---------- Claude API helper ----------
+// ---------------------------------------------------------------
+// All AI calls go to our own backend at /api/claude.
+// The backend holds the API key and forwards the request to Anthropic.
+// The browser never sees the key, and there is no CORS issue.
+// ---------------------------------------------------------------
 async function callClaude(content, opts={}){
-  const body = { model: "claude-sonnet-4-6", max_tokens: opts.maxTokens || 1000, messages: [{ role: "user", content: content }] };
-  if(opts.system) body.system = opts.system;
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
-  });
-  if(!res.ok){ throw new Error("Request failed (" + res.status + ")"); }
-  const data = await res.json();
-  const textBlock = data.content.find(b=>b.type==="text");
-  if(!textBlock){ throw new Error("No response received."); }
-  return textBlock.text;
+  let res;
+  try{
+    res = await fetch("/api/claude", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: content,
+        system: opts.system || null,
+        maxTokens: opts.maxTokens || 1000
+      })
+    });
+  }catch(networkErr){
+    throw new Error("Can't reach the server. Make sure you started it with `npm start` and opened http://localhost:3000 (not the .html file directly).");
+  }
+
+  let data;
+  try{ data = await res.json(); }
+  catch(e){ throw new Error("The server sent back an unreadable response."); }
+
+  if(!res.ok){
+    throw new Error(data && data.error ? data.error : ("Request failed (" + res.status + ")"));
+  }
+  if(!data.text){ throw new Error("No response received."); }
+  return data.text;
 }
+
 function setLoading(btn, isLoading){ btn.disabled = isLoading; btn.classList.toggle('loading', isLoading); }
 function showError(el, msg){ if(!el) return; el.textContent = msg; el.style.display = msg ? 'block' : 'none'; }
 
@@ -38,6 +57,7 @@ function wireImageSlot(prefix, onReady, onCleared){
   function handle(file){
     if(errEl) showError(errEl, '');
     if(!file.type.match(/image\/(png|jpeg|jpg|webp)/)){ if(errEl) showError(errEl, 'Please upload a PNG, JPG, or WEBP image.'); return; }
+    if(file.size > 5 * 1024 * 1024){ if(errEl) showError(errEl, 'That image is larger than 5MB. Please use a smaller one.'); return; }
     const reader = new FileReader();
     reader.onload = ()=>{
       data = { base64: reader.result.split(',')[1], mediaType: file.type };
@@ -70,7 +90,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
       });
     });
   });
-  // segmented controls: generic wiring, stores selection on the control's dataset
+  // segmented controls
   document.querySelectorAll('.segmented').forEach(seg=>{
     const buttons = seg.querySelectorAll('button');
     buttons.forEach(b=>{
